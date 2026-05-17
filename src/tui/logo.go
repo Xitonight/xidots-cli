@@ -16,7 +16,6 @@ var logoStr = strings.TrimSpace(`
 `)
 
 type logo struct {
-	style    lipgloss.Style
 	gradient []color.Color
 
 	width  int
@@ -34,8 +33,6 @@ func newLogo() *logo {
 }
 
 func (l *logo) setStyles() {
-	l.style = lipgloss.NewStyle().
-		PaddingBottom(1)
 	l.gradient = lipgloss.Blend2D(
 		l.width,
 		l.height,
@@ -75,5 +72,5 @@ func (l *logo) View() string {
 		}
 	}
 
-	return l.style.Render(buf.String())
+	return buf.String()
 }
