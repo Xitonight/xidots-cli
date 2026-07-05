@@ -1,8 +1,9 @@
-package tui
+package logo
 
 import (
 	"image/color"
 	"strings"
+	"xidots-cli/src/tui/theme"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -15,16 +16,25 @@ var logoStr = strings.TrimSpace(`
 ██ ██ ██ ████▀ ▀███▀  ██  ▄▄██▀     ▀████ ██▄▄▄ ██
 `)
 
-type logo struct {
+type Model struct {
+	frame    lipgloss.Style
 	gradient []color.Color
 
 	width  int
 	height int
 }
 
-func newLogo() *logo {
+func (m *Model) GetWidth() int {
+	return m.width
+}
+
+func (m *Model) GetHeight() int {
+	return m.height
+}
+
+func New() *Model {
 	w, h := lipgloss.Size(strings.TrimSpace(logoStr))
-	l := &logo{
+	l := &Model{
 		width:  w,
 		height: h,
 	}
@@ -32,45 +42,46 @@ func newLogo() *logo {
 	return l
 }
 
-func (l *logo) setStyles() {
-	l.gradient = lipgloss.Blend2D(
-		l.width,
-		l.height,
+func (m *Model) setStyles() {
+	m.frame = lipgloss.NewStyle().MarginBottom(1)
+	m.gradient = lipgloss.Blend2D(
+		m.width,
+		m.height,
 		180,
 		tint.Current().Purple,
 		tint.Current().Blue,
 	)
 }
 
-func (l *logo) Init() tea.Cmd {
+func (m *Model) Init() tea.Cmd {
 	return nil
 }
 
-func (l *logo) Update(msg tea.Msg) tea.Cmd {
+func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg.(type) {
-	case ThemeChangedMsg:
-		l.setStyles()
+	case theme.ThemeChangedMsg:
+		m.setStyles()
 	}
 	return nil
 }
 
-func (l *logo) View() string {
+func (m *Model) View() string {
 	lines := strings.Split(logoStr, "\n")
 
 	buf := strings.Builder{}
-	for y := range l.height {
+	for y := range m.height {
 		runes := []rune(lines[y])
-		for x := range l.width {
+		for x := range m.width {
 			buf.WriteString(
 				lipgloss.NewStyle().
-					Foreground(l.gradient[y*l.width+x]).
+					Foreground(m.gradient[y*m.width+x]).
 					Render(string(runes[x])),
 			)
 		}
-		if y < l.height-1 { // End of row.
+		if y < m.height-1 { // End of row.
 			buf.WriteString("\n")
 		}
 	}
 
-	return buf.String()
+	return m.frame.Render(buf.String())
 }

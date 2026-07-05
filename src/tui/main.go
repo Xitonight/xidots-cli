@@ -3,7 +3,10 @@ package tui
 import (
 	"fmt"
 	"os"
-	"strings"
+	"xidots-cli/src/tui/actions"
+	"xidots-cli/src/tui/logo"
+	"xidots-cli/src/tui/theme"
+	"xidots-cli/src/tui/tuihelp"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -13,27 +16,27 @@ import (
 	tint "github.com/lrstanley/bubbletint/v2"
 )
 
-type ThemeChangedMsg struct{}
-
 type model struct {
-	keys keyMap
+	keys tuihelp.KeyMap
 	help help.Model
 
 	width  int
 	height int
 
 	spinner spinner.Model
-	logo    *logo
+	logo    *logo.Model
+	actions *actions.Model
 
 	quitting bool
 }
 
 func initialModel() *model {
 	m := &model{
-		keys:    keys,
+		keys:    tuihelp.Keys,
 		help:    help.New(),
 		spinner: spinner.New(spinner.WithSpinner(spinner.Dot)),
-		logo:    newLogo(),
+		logo:    logo.New(),
+		actions: actions.New(),
 	}
 
 	return m
@@ -42,6 +45,7 @@ func initialModel() *model {
 func (m model) propagate(msg tea.Msg) tea.Cmd {
 	cmds := []tea.Cmd{
 		m.logo.Update(msg),
+		m.actions.Update(msg),
 	}
 	return tea.Batch(cmds...)
 }
@@ -56,26 +60,31 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.help.SetWidth(msg.Width)
+		m.actions.SetSize(
+			msg.Width,
+			msg.Height-m.logo.GetHeight()-lipgloss.Height(m.help.View(m.keys)),
+		)
 
 	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, m.keys.Left):
 			tint.PreviousTint()
-			return m, func() tea.Msg { return ThemeChangedMsg{} }
+			return m, theme.ThemeChanged
 		case key.Matches(msg, m.keys.Right):
 			tint.NextTint()
-			return m, func() tea.Msg { return ThemeChangedMsg{} }
+			return m, theme.ThemeChanged
 		case key.Matches(msg, m.keys.Help):
 			m.help.ShowAll = !m.help.ShowAll
+			m.actions.SetSize(
+				m.width,
+				m.height-m.logo.GetHeight()-lipgloss.Height(m.help.View(m.keys)),
+			)
 		case key.Matches(msg, m.keys.Quit):
 			m.quitting = true
 			return m, tea.Quit
 		}
 
-	case ThemeChangedMsg:
-		return m, m.propagate(msg)
-
-	default:
+	case spinner.TickMsg:
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
@@ -96,21 +105,19 @@ func (m model) View() tea.View {
 		return view
 	}
 
-	logo := lipgloss.NewStyle().PaddingBottom(1).Render(m.logo.View())
-	loadingTitle := lipgloss.JoinHorizontal(lipgloss.Left, m.spinner.View(), "Loading...")
+	logo := m.logo.View()
+	actions := m.actions.View()
 	helpView := m.help.View(m.keys)
 
-	content := lipgloss.JoinVertical(lipgloss.Left, logo, loadingTitle)
+	content := lipgloss.JoinVertical(lipgloss.Left, logo, actions, helpView)
 
-	height := m.height - 1 - strings.Count(content, "\n") - strings.Count(helpView, "\n")
-	view.SetContent(content + strings.Repeat("\n", height) + helpView)
-
+	// height := m.height - 1 - strings.Count(content, "\n") - strings.Count(helpView, "\n")
+	view.SetContent(content)
 	return view
 }
 
 func Run() {
-	tint.NewDefaultRegistry()
-	tint.SetTint(tint.TintDracula)
+	theme.Init()
 
 	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
